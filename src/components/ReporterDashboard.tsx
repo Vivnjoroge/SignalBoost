@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
-import { FileText, CheckCircle2, Clock, Zap, Trash2, AlertCircle, Plus, Send, Sparkles, MapPin, Tag } from 'lucide-react';
+import React, { useMemo, useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { FileText, CheckCircle2, Clock, Zap, Trash2, AlertCircle, Plus, Send, Sparkles, MapPin, Tag, X } from 'lucide-react';
 import { Story, User, StorySubmission, Category } from '../types';
 import { StoryCard } from './StoryCard';
 
@@ -16,6 +16,7 @@ interface Props {
 
 export default function ReporterDashboard({ user, stories, onStoryClick, onDeleteStory, onSubmitStory }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<StorySubmission>({
     title: '',
     description: '',
@@ -23,6 +24,31 @@ export default function ReporterDashboard({ user, stories, onStoryClick, onDelet
     category: 'Emergency',
     media: []
   });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const fileList = Array.from(files);
+    fileList.forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setFormData(prev => ({
+          ...prev,
+          media: [...prev.media, base64String]
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeMedia = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      media: prev.media.filter((_, i) => i !== index)
+    }));
+  };
 
   const myStories = useMemo(() => {
     return stories.filter(s => s.authorId === user.id);
@@ -77,16 +103,27 @@ export default function ReporterDashboard({ user, stories, onStoryClick, onDelet
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
         {/* Left: Submission Form */}
         <div className="lg:col-span-3 space-y-8">
-          <div className="bg-white rounded-[3rem] p-8 sm:p-12 card-shadow border border-brand-primary/5">
-            <div className="flex items-center gap-4 mb-10">
-              <div className="w-12 h-12 bg-brand-accent/10 rounded-2xl flex items-center justify-center">
-                <Plus className="w-6 h-6 text-brand-accent" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold">Submit a New Signal</h2>
-                <p className="text-sm text-brand-primary/40">Provide clear details for faster verification.</p>
-              </div>
+          <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-brand-primary/5">
+            <div className="h-48 w-full relative overflow-hidden">
+              <img 
+                src="https://picsum.photos/seed/reporting/800/400" 
+                alt="Community Reporting" 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent" />
             </div>
+
+            <div className="p-8 sm:p-12 pt-4">
+              <div className="flex items-center gap-4 mb-10">
+                <div className="w-12 h-12 bg-brand-accent/10 rounded-2xl flex items-center justify-center">
+                  <Plus className="w-6 h-6 text-brand-accent" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">Submit a New Signal</h2>
+                  <p className="text-sm text-brand-primary/40">Provide clear details for faster verification.</p>
+                </div>
+              </div>
 
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="space-y-2">
@@ -152,12 +189,66 @@ export default function ReporterDashboard({ user, stories, onStoryClick, onDelet
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-brand-primary/40">Media Upload</label>
-                <div className="w-full h-32 border-2 border-dashed border-brand-primary/10 rounded-2xl flex flex-col items-center justify-center gap-2 text-brand-primary/20 hover:bg-brand-bg transition-colors cursor-pointer">
-                  <Plus className="w-6 h-6" />
-                  <span className="text-xs font-bold uppercase tracking-widest">Add Photos or Video</span>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-widest text-brand-primary/40">Proof of Story</label>
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-brand-accent/10 rounded-full">
+                    <AlertCircle className="w-3 h-3 text-brand-accent" />
+                    <span className="text-[10px] font-bold text-brand-accent uppercase tracking-widest">Required for Verification</span>
+                  </div>
                 </div>
+                
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                  <AnimatePresence mode="popLayout">
+                    {formData.media.map((src, index) => (
+                      <motion.div 
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        key={index} 
+                        className="relative aspect-square rounded-2xl overflow-hidden border border-brand-primary/5 group bg-brand-bg shadow-sm"
+                      >
+                        {src.startsWith('data:video') ? (
+                          <video src={src} className="w-full h-full object-cover" />
+                        ) : (
+                          <img src={src} alt="Preview" className="w-full h-full object-cover" />
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => removeMedia(index)}
+                            className="p-2 bg-white/20 backdrop-blur-md hover:bg-rose-500 rounded-full transition-all text-white transform scale-75 group-hover:scale-100"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  
+                  <motion.button
+                    layout
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="aspect-square rounded-2xl border-2 border-dashed border-brand-primary/10 flex flex-col items-center justify-center gap-2 text-brand-primary/30 hover:bg-brand-bg hover:border-brand-accent/30 hover:text-brand-accent transition-all group relative overflow-hidden"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-brand-bg flex items-center justify-center group-hover:bg-brand-accent/10 transition-colors">
+                      <Plus className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Add Proof</span>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand-accent transform translate-y-full group-hover:translate-y-0 transition-transform" />
+                  </motion.button>
+                </div>
+                
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*,video/*"
+                  multiple
+                  onChange={handleFileChange}
+                />
               </div>
 
               <button
@@ -177,6 +268,7 @@ export default function ReporterDashboard({ user, stories, onStoryClick, onDelet
             </form>
           </div>
         </div>
+      </div>
 
         {/* Right: My Reports */}
         <div className="lg:col-span-2 space-y-8">
