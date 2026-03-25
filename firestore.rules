@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (matches Firebase Auth UID)
+    // Fields:
+    //   - fullName: string (required, 2-100 chars)
+    //   - email: string (required, valid email format)
+    //   - role: string (required, 'REPORTER' or 'INSTITUTION')
+    //
+    // Collection: stories
+    // Document ID: {storyId}
+    // Fields:
+    //   - authorId: string (required, matches author's UID)
+    //   - authorName: string (required, 2-100 chars)
+    //   - title: string (required, 5-200 chars)
+    //   - description: string (required, 10-5000 chars)
+    //   - location: string (required, 2-200 chars)
+    //   - category: string (required, enum)
+    //   - createdAt: string (required, ISO 8601)
+    //   - status: string (required, enum)
+    //   - summary: string (optional, AI generated)
+    //   - tags: list (optional, AI generated)
+    //   - impactScore: number (optional, 0-100)
+    //   - impactBreakdown: map (optional)
+    //   - verificationLevel: string (optional, enum)
+    //   - amplifiedCount: number (required, >= 0)
+    //   - bookmarkedBy: list (required, list of UIDs)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.authorId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "viviannjoroge91@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isInstitution() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'INSTITUTION';
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['fullName', 'email', 'role']) &&
+             data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100 &&
+             isValidEmail(data.email) &&
+             data.role in ['REPORTER', 'INSTITUTION'];
+    }
+
+    function isValidStory(data) {
+      return data.keys().hasAll(['authorId', 'authorName', 'title', 'description', 'location', 'category', 'createdAt', 'status', 'amplifiedCount', 'bookmarkedBy']) &&
+             data.authorId is string &&
+             data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 100 &&
+             data.title is string && data.title.size() >= 5 && data.title.size() <= 200 &&
+             data.description is string && data.description.size() >= 10 && data.description.size() <= 5000 &&
+             data.location is string && data.location.size() >= 2 && data.location.size() <= 200 &&
+             data.category in ['Emergency', 'Infrastructure', 'Community Issue', 'Health', 'Education', 'Environment', 'Innovation', 'Other'] &&
+             isValidDateString(data.createdAt) &&
+             data.status in ['pending', 'verified', 'rejected', 'handled', 'in-progress'] &&
+             data.amplifiedCount is number && data.amplifiedCount >= 0 &&
+             data.bookmarkedBy is list;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      request.resource.data.role == resource.data.role; // Role cannot be changed by user
+    }
+
+    match /stories/{storyId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && 
+                      isValidStory(request.resource.data) && 
+                      request.resource.data.authorId == request.auth.uid &&
+                      request.resource.data.status == 'pending' &&
+                      request.resource.data.amplifiedCount == 0 &&
+                      request.resource.data.bookmarkedBy.size() == 0;
+
+      allow update: if isAuthenticated() && (
+                      // Reporter updating their own story (only if pending)
+                      (isDocOwner() && 
+                       resource.data.status == 'pending' && 
+                       isValidStory(request.resource.data) &&
+                       request.resource.data.authorId == resource.data.authorId &&
+                       request.resource.data.status == resource.data.status) ||
+                      
+                      // Institution updating status or bookmarking
+                      (isInstitution() && 
+                       isValidStory(request.resource.data) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'bookmarkedBy'])) ||
+                      
+                      // Anyone amplifying (atomic increment)
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amplifiedCount']) &&
+                       request.resource.data.amplifiedCount == resource.data.amplifiedCount + 1)
+                    );
+
+      allow delete: if isDocOwner() && resource.data.status == 'pending';
+    }
+  }
+}

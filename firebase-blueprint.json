@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the StorySasa platform.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string", "description": "The user's full name." },
+        "email": { "type": "string", "format": "email", "description": "The user's email address." },
+        "role": { "type": "string", "enum": ["REPORTER", "INSTITUTION"], "description": "The user's role on the platform." }
+      },
+      "required": ["fullName", "email", "role"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "A community story report submitted by a reporter.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string", "description": "The UID of the reporter who submitted the story." },
+        "authorName": { "type": "string", "description": "The name of the reporter." },
+        "title": { "type": "string", "description": "The title of the story." },
+        "description": { "type": "string", "description": "The detailed description of the story." },
+        "location": { "type": "string", "description": "The location where the story occurred." },
+        "category": { "type": "string", "enum": ["Emergency", "Infrastructure", "Community Issue", "Health", "Education", "Environment", "Innovation", "Other"], "description": "The category of the story." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "The timestamp when the story was created." },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected", "handled", "in-progress"], "description": "The current status of the story." },
+        "summary": { "type": "string", "description": "An AI-generated summary of the story." },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "AI-suggested tags for the story." },
+        "impactScore": { "type": "integer", "description": "The AI-calculated impact score (1-100)." },
+        "impactBreakdown": {
+          "type": "object",
+          "properties": {
+            "urgency": { "type": "integer" },
+            "reach": { "type": "integer" },
+            "relevance": { "type": "integer" }
+          }
+        },
+        "verificationLevel": { "type": "string", "enum": ["Low", "Medium", "High"], "description": "The AI-determined verification confidence level." },
+        "amplifiedCount": { "type": "integer", "description": "The number of times the story has been boosted." },
+        "bookmarkedBy": { "type": "array", "items": { "type": "string" }, "description": "List of user UIDs who have bookmarked this story." }
+      },
+      "required": ["authorId", "authorName", "title", "description", "location", "category", "createdAt", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents."
+    },
+    "/stories/{storyId}": {
+      "schema": "Story",
+      "description": "Community story reports."
+    }
+  }
+}
