@@ -154,7 +154,7 @@ export default function AuthPages({ onSuccess }: Props) {
               disabled={loading}
               className="w-full py-4 bg-white border border-brand-primary/10 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-brand-bg transition-all group disabled:opacity-50"
             >
-              <img src="https://www.gstatic.com/firebase/anonymous-scan.png" alt="Google" className="w-5 h-5" referrerPolicy="no-referrer" />
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" referrerPolicy="no-referrer" />
               <span>Sign in with Google</span>
             </button>
 
@@ -222,7 +222,7 @@ export default function AuthPages({ onSuccess }: Props) {
                       onClick={() => setRole('REPORTER')}
                       className={`p-4 rounded-2xl border-2 transition-all text-left ${role === 'REPORTER' ? 'border-brand-accent bg-brand-accent/5' : 'border-brand-bg bg-white'}`}
                     >
-                      <p className="font-bold text-sm">Citizen Reporter</p>
+                      <p className="font-bold text-sm">Mwananchi Reporter</p>
                       <p className="text-[10px] text-brand-primary/40">Submit real-time reports</p>
                     </button>
                     <button
